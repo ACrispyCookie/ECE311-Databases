@@ -34,7 +34,7 @@ services:
     ports:
       - "3306:$MYSQL_PORT"
     volumes:
-      - ./mysql:/var/lib/mysql
+      - ./database/mysql:/var/lib/mysql
     networks:
       - custom_network
 
