@@ -19,6 +19,10 @@ docker exec -it mysql /bin/bash
 mysql -u user -psecret
 ```
 
+```sql
+USE project_database;
+```
+
 Copy and paste the contents of `/database/schema.sql` in the terminal to create the schema of MySQL database.
 
 (TODO: automate schema and seed)
