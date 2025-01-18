@@ -3,13 +3,14 @@ networks:
     driver: bridge
 
 services:
-  django:
+  notes_app:
     depends_on:
-      - mysql
+      mysql:
+        condition: service_healthy
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: django
+    container_name: notes_app
     restart: always
     environment:
       MYSQL_DATABASE: $MYSQL_DATABASE
@@ -18,13 +19,13 @@ services:
       MYSQL_HOST: mysql
       MYSQL_PORT: $MYSQL_PORT
     ports:
-      - "8000:8000"
+      - "9000:9000"
     volumes:
       - "./backend:/app"
     networks:
       - custom_network
-
   mysql:
+
     image: mysql:latest
     container_name: mysql
     restart: always
@@ -33,6 +34,10 @@ services:
       MYSQL_DATABASE: $MYSQL_DATABASE
       MYSQL_USER: $MYSQL_USER
       MYSQL_PASSWORD: $MYSQL_PASSWORD
+    healthcheck:
+      test: ["CMD", "mysqladmin" ,"ping", "-h", "localhost"]
+      timeout: 5s
+      retries: 10
     volumes:
       - ./database/mysql:/var/lib/mysql
     networks:
