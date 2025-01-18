@@ -1,20 +1,15 @@
 from django.http import HttpResponse, JsonResponse
 from django.db import transaction, connection
 
-def get_department(departmentCode=None):
-    if departmentCode == None:
-        query = "SELECT * FROM Departments;"
-        params = []
-        return get_public_request(query, params)
-    else:
-        query = "SELECT * FROM Departments WHERE departmentCode = %s;"
-        params = [departmentCode]
-        empty_response = JsonResponse({"error": "Department not found"}, safe=False)
-        return get_public_request(query, params, empty_response)
+def get_department(user_id):
+    query = "SELECT * FROM Departments WHERE departmentCode = (SELECT departmentCode FROM Users WHERE id=%s);"
+    params = [user_id]
+    empty_response = JsonResponse({"error": "Department not found"}, safe=False)
+    return get_public_request(query, params, empty_response)
 
-def get_courses(departmentCode):
-    query = "SELECT * FROM Courses WHERE departmentCode = %s;"
-    params = [departmentCode]
+def get_courses(user_id):
+    query = "SELECT * FROM Courses WHERE departmentCode = (SELECT departmentCode FROM Users WHERE id=%s);"
+    params = [user_id]
     return get_public_request(query, params)
 
 def get_course(courseId):
@@ -75,7 +70,7 @@ def create_category(categoryTitle, courseId):
     execute_query("INSERT INTO Categories (categoryTitle, courseId) VALUES (%s, %s)", [categoryTitle, courseId])
 
 def create_user(user_id, username, departmentCode):
-    execute_query("INSERT INTO Users (username, id, departmentCode) VALUES (%s, %s, %s)", [user_id, username, departmentCode])
+    execute_query("INSERT INTO Users (username, id, departmentCode) VALUES (%s, %s, %s)", [username, user_id, departmentCode])
 
 def create_post(url, title, userId, titleId, courseId):
     pass
