@@ -1,63 +1,84 @@
 from django.shortcuts import render
 from django.views.decorators.http import require_http_methods
-from . import database_service as db_service
 from django.http import JsonResponse
+from django.db import transaction, connection
+from . import database_service as db_service
+from json import JSONDecodeError
+import requests
 
 not_authenticated = JsonResponse({"error": "Not authenticated"}, safe=False)
     
 @require_http_methods(["GET"])
 def department(request, departmentCode=None):
-    if check_authenticated() is None:
+    jsessionid = request.COOKIES.get('JSESSIONID', None)
+    csrf_token = request.COOKIES.get('X-Csrf-Token', None)
+    if check_authenticated(jsessionid, csrf_token) is None:
         return not_authenticated
     return db_service.get_department(departmentCode)
 
 @require_http_methods(["GET"])
 def department_courses(request, departmentCode):
-    if check_authenticated() is None:
+    jsessionid = request.COOKIES.get('JSESSIONID', None)
+    csrf_token = request.COOKIES.get('X-Csrf-Token', None)
+    if check_authenticated(jsessionid, csrf_token) is None:
         return not_authenticated
     return db_service.get_courses(departmentCode)
 
 @require_http_methods(["GET"])
 def course(request, courseId):
-    if check_authenticated() is None:
+    jsessionid = request.COOKIES.get('JSESSIONID', None)
+    csrf_token = request.COOKIES.get('X-Csrf-Token', None)
+    if check_authenticated(jsessionid, csrf_token) is None:
         return not_authenticated
     return db_service.get_course(courseId)
 
 @require_http_methods(["GET"])
 def course_categories(request, courseId):
-    if check_authenticated() is None:
+    jsessionid = request.COOKIES.get('JSESSIONID', None)
+    csrf_token = request.COOKIES.get('X-Csrf-Token', None)
+    if check_authenticated(jsessionid, csrf_token) is None:
         return not_authenticated
     return db_service.get_categories(courseId)
 
 @require_http_methods(["GET"])
 def category_posts(request, courseId, titleId):
-    if check_authenticated() is None:
+    jsessionid = request.COOKIES.get('JSESSIONID', None)
+    csrf_token = request.COOKIES.get('X-Csrf-Token', None)
+    if check_authenticated(jsessionid, csrf_token) is None:
         return not_authenticated
     return db_service.get_category_posts(courseId, titleId)
 
 @require_http_methods(["GET"])
 def user(request, userId):
-    if check_authenticated() is None:
+    jsessionid = request.COOKIES.get('JSESSIONID', None)
+    csrf_token = request.COOKIES.get('X-Csrf-Token', None)
+    if check_authenticated(jsessionid, csrf_token) is None:
         return not_authenticated
     return db_service.get_user(userId)
 
 @require_http_methods(["GET"])
 def user_posts(request, userId):
-    if check_authenticated() is None:
+    jsessionid = request.COOKIES.get('JSESSIONID', None)
+    csrf_token = request.COOKIES.get('X-Csrf-Token', None)
+    if check_authenticated(jsessionid, csrf_token) is None:
         return not_authenticated
     return db_service.get_user_posts(userId)
 
 @require_http_methods(["GET", "POST"])
 def post(request, postId=None):
+    jsessionid = request.COOKIES.get('JSESSIONID', None)
+    csrf_token = request.COOKIES.get('X-Csrf-Token', None)
     if request.method == "POST":
         return JsonResponse()
-    elif check_authenticated() is None:
-        return not_authenticated:
+    elif check_authenticated(jsessionid, csrf_token) is None:
+        return not_authenticated
     return db_service.get_post(postId)
 
 @require_http_methods(["GET"])
 def post_reactions(request, postId):
-    if check_authenticated() is None:
+    jsessionid = request.COOKIES.get('JSESSIONID', None)
+    csrf_token = request.COOKIES.get('X-Csrf-Token', None)
+    if check_authenticated(jsessionid, csrf_token) is None:
         return not_authenticated
     return db_service.get_post_reactions(postId, request.GET)
 
@@ -70,6 +91,35 @@ for your application (e.g., by checking session data, token, etc.).
 Returns:
     str: The userId of the authenticated user or None if authentication failed
 """
-def check_authenticated(cookie):
-    return "1"
+def check_authenticated(cookie, csrf_token):
+    if cookie is None or csrf_token is None:
+        return None
+    user_profile_request = requests.get('https://sis-web.uth.gr/api/person/profiles',
+                     cookies={'JSESSIONID': cookie},
+                     headers={'X-Csrf-Token': csrf_token})
+    
+    try:
+        profile = user_profile_request.json()
+        if "studentProfiles" not in profile:
+            return None
+        user_profile = profile["studentProfiles"]
+        user_id = user_profile["user_id"]
+        departmentCode = user_profile["departmentCode"]
+
+        department_exists_result = db_service.dictfetchall(db_service.execute_query("SELECT COUNT(*) as count FROM Departments WHERE departmentCode=%s", [departmentCode]))
+        if department_exists_result["count"] == 0:
+            courses_request = requests.get('https://sis-web.uth.gr/feign/student/program_courses',
+                            cookies={'JSESSIONID': cookie},
+                            headers={'X-Csrf-Token': csrf_token})
+            departmentTitle = user_profile["departmentTitle"]
+            db_service.create_department(departmentCode, departmentTitle, courses_request["programCourses"])
+
+        user_exists_result = db_service.dictfetchall(db_service.execute_query("SELECT COUNT(*) as count FROM Users WHERE id=%s", [user_id]))
+        if user_exists_result["count"] == 0:
+            username = user_profile["username"]
+            db_service.create_user(user_id, username, departmentCode)
+        
+        return user_id
+    except JSONDecodeError:
+        return None
 

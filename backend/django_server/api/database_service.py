@@ -63,22 +63,24 @@ def get_post_reactions(postId, params):
     params = [postId, params["type"]]
     return get_public_request(query, params)
 
-def create_department():
+def create_department(departmentCode, departmentTitle, courses):
+    execute_query("INSERT INTO Departments (departmentTitle, departmentCode) VALUES (%s, %s)", [departmentTitle, departmentCode])
+    for course in courses:
+        create_course(course["title"], course["courseCode"], course["id"], departmentCode);
+
+def create_course(courseTitle, courseCode, courseId, departmentCode):
+    execute_query("INSERT INTO Courses (courseTitle, courseCode, courseId, departmentCode) VALUES (%s, %s, %s, %s)", [courseTitle, courseCode, courseId, departmentCode])
+
+def create_category(categoryTitle, courseId):
+    execute_query("INSERT INTO Categories (categoryTitle, courseId) VALUES (%s, %s)", [categoryTitle, courseId])
+
+def create_user(user_id, username, departmentCode):
+    execute_query("INSERT INTO Users (username, id, departmentCode) VALUES (%s, %s, %s)", [user_id, username, departmentCode])
+
+def create_post(url, title, userId, titleId, courseId):
     pass
 
-def create_course():
-    pass
-
-def create_category():
-    pass
-
-def create_user():
-    pass
-
-def create_post():
-    pass
-
-def create_reaction():
+def create_reaction(upvote, userId, postId):
     pass
 
 """
