@@ -66,7 +66,7 @@ def course_categories(request, courseId):
 
 @csrf_exempt
 @require_http_methods(["GET", "POST", "OPTIONS"])
-def category_posts(request, courseId, titleId):
+def category_posts(request, courseId, categoryTitle):
     fernet = Fernet(os.environ.get('FERNET_KEY'))
     jsessionid = fernet.decrypt(request.headers.get('x-jsessionid', None).encode()).decode()
     csrf_token = fernet.decrypt(request.headers.get('x-sis-csrf-token', None).encode()).decode()

@@ -9,7 +9,7 @@ CREATE TABLE Posts (
     url             VARCHAR(255),
     title           VARCHAR(255),
     createdAt       TIMESTAMP,
-    id              INTEGER NOT NULL AUTO INCREMENT,
+    id              INTEGER NOT NULL AUTO_INCREMENT,
     userId          CHAR(72),
     categoryTitle   VARCHAR(255),
     courseId        CHAR(36),
