@@ -9,9 +9,9 @@ CREATE TABLE Posts (
     url             VARCHAR(255),
     title           VARCHAR(255),
     createdAt       TIMESTAMP,
-    id              INTEGER NOT NULL,
+    id              INTEGER NOT NULL AUTO INCREMENT,
     userId          CHAR(72),
-    titleId         VARCHAR(255),
+    categoryTitle   VARCHAR(255),
     courseId        CHAR(36),
     PRIMARY KEY (id)
 );
@@ -66,7 +66,7 @@ CREATE TABLE Fullnames (
 );
 
 ALTER TABLE Users ADD FOREIGN KEY (departmentCode) REFERENCES Departments (departmentCode) ON DELETE SET NULL ON UPDATE CASCADE;
-ALTER TABLE Posts ADD FOREIGN KEY (titleId, courseId) REFERENCES Categories (title, courseId) ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE Posts ADD FOREIGN KEY (categoryTitle, courseId) REFERENCES Categories (title, courseId) ON DELETE SET NULL ON UPDATE CASCADE;
 ALTER TABLE Courses ADD FOREIGN KEY (departmentCode) REFERENCES Departments (departmentCode) ON DELETE SET NULL ON UPDATE CASCADE;
 ALTER TABLE Posts ADD FOREIGN KEY (userId) REFERENCES Users (id) ON DELETE SET NULL ON UPDATE CASCADE;
 

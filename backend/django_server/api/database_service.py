@@ -7,9 +7,14 @@ def get_department(userId):
     empty_response = JsonResponse({"error": "Department not found"}, safe=False)
     return get_public_request(query, params, empty_response)
 
-def get_courses(userId):
-    query = "SELECT * FROM Courses WHERE departmentCode = (SELECT departmentCode FROM Users WHERE id=%s);"
-    params = [userId]
+def get_courses(userId, courseTitle):
+    if courseTitle is None:
+        query = "SELECT * FROM Courses WHERE departmentCode = (SELECT departmentCode FROM Users WHERE id=%s);"
+        params = [userId]
+    else: 
+        query = "SELECT * FROM Courses WHERE LOWER(courseTitle) LIKE %s AND departmentCode = (SELECT departmentCode FROM Users WHERE id=%s);"
+        params = [f"%{courseTitle.lower()}%", userId]
+    # return JsonResponse({"query": query, "params": params})
     return get_public_request(query, params)
 
 def get_course(userId, courseId):
@@ -20,19 +25,27 @@ def get_course(userId, courseId):
     empty_response = JsonResponse({"error": "Course not found"}, safe=False)
     return get_permission_request(query, params, permission_query, permission_params, empty_response)
 
-def get_categories(userId, courseId):
-    query = "SELECT * FROM Categories WHERE courseId = %s;"
-    params = [courseId]
+def get_categories(userId, courseId, categoryTitle):
+    if categoryTitle is None:
+        query = "SELECT * FROM Categories WHERE courseId = %s;"
+        params = [courseId]
+    else: 
+        query = "SELECT * FROM Categories WHERE LOWER(title) LIKE %s AND courseId = %s;"
+        params = [f"%{categoryTitle.lower()}%", courseId]
     permission_query = "SELECT id FROM Users as u INNER JOIN Courses as c ON u.departmentCode=c.departmentCode WHERE u.id=%s AND c.courseId=%s"
     permission_params = [userId, courseId]
-    return get_permission_request(query, params, permission_query, permission_params, empty_response)
+    return get_permission_request(query, params, permission_query, permission_params)
 
-def get_category_posts(userId, courseId, titleId):
-    query = "SELECT * FROM Posts WHERE courseId = %s AND titleId = %s;"
-    params = [courseId, titleId]
+def get_category_posts(userId, courseId, categoryTitle, postTitle):
+    if postTitle is None:
+        query = "SELECT * FROM Posts WHERE courseId = %s AND categoryTitle = %s;"
+        params = [courseId, categoryTitle]
+    else: 
+        query = "SELECT * FROM Posts WHERE courseId = %s AND categoryTitle = %s AND title LIKE %s;"
+        params = [courseId, categoryTitle, f"%{postTitle.lower()}%",]
     permission_query = "SELECT id FROM Users as u INNER JOIN Courses as c ON u.departmentCode=c.departmentCode WHERE u.id=%s AND c.courseId=%s"
     permission_params = [userId, courseId]
-    return get_permission_request(query, params, permission_query, permission_params, empty_response)
+    return get_permission_request(query, params, permission_query, permission_params)
 
 def get_user(userId, user_to_find):
     query = "SELECT * FROM Users WHERE id = %s;"
@@ -80,17 +93,58 @@ def create_department(departmentCode, departmentTitle, courses):
 def create_course(courseTitle, courseCode, courseId, departmentCode):
     execute_query("INSERT INTO Courses (courseTitle, courseCode, courseId, departmentCode) VALUES (%s, %s, %s, %s)", [courseTitle, courseCode, courseId, departmentCode])
 
-def create_category(categoryTitle, courseId):
-    execute_query("INSERT INTO Categories (categoryTitle, courseId) VALUES (%s, %s)", [categoryTitle, courseId])
+def create_category(userId, categoryTitle, courseId):
+    query = "INSERT INTO Categories (categoryTitle, courseId) VALUES (%s, %s)"
+    params = [categoryTitle, courseId]
+    permission_query = """SELECT id FROM Developers WHERE id=%s
+                        UNION
+                        SELECT id FROM Admins WHERE id IN (SELECT u.id FROM Users as u INNER JOIN Courses as c ON u.departmentCode=c.departmentCode INNER JOIN Categories as ca ON c.courseId=ca.courseId WHERE u.id=%s AND ca.courseId=%s)"""
+    permission_params = [userId, userId, courseId]
+    return post_request(query, params, permission_query, permission_params)
 
 def create_user(userId, username, departmentCode):
     execute_query("INSERT INTO Users (username, id, departmentCode) VALUES (%s, %s, %s)", [username, userId, departmentCode])
 
-def create_post(url, title, userId, titleId, courseId):
-    pass
+def create_post(url, title, userId, categoryTitle, courseId):
+    query = "INSERT INTO Posts (url, title, createdAt, userId, categoryTitle, courseId) VALUES (%s, %s, %s, %s, %s, %s)"
+    params = [url, title, datetime.datetime.now(), userId, categoryTitle, courseId]
+    permission_query = "SELECT u.id FROM Users as u INNER JOIN Courses as c ON u.departmentCode=c.departmentCode WHERE u.id=%s AND c.courseId=%s"
+    permission_params = [userId, courseId]
+    return post_request(query, params, permission_query, permission_params)
 
 def create_reaction(upvote, userId, postId):
-    pass
+    query = "INSERT INTO Reactions (upvote, userId, postId) VALUES (%s, %s, %s)"
+    params = [upvote, userId, postId]
+    permission_query = "SELECT u.id FROM Users as u INNER JOIN Courses as c ON u.departmentCode=c.departmentCode WHERE u.id=%s AND c.courseId=%s"
+    permission_params = [userId, courseId]
+    return post_request(query, params, permission_query, permission_params)
+    
+
+"""
+Handles a simple POST request by executing a SQL query and returning a JSON response.
+
+This function checks for the presence of a permission query and it verifies 
+whether the user has the required permission. If no permission is found, it returns an error 
+response. After that, it executes the main query and returns a JSON response.
+
+Parameters:
+    query (str): The SQL query to execute.
+    params (tuple): The parameters to pass to the SQL query.
+    permission_query (str, optional): The SQL query to check for permissions (default is None).
+    permission_params (tuple, optional): The parameters to pass with the permission query (default is None).
+
+Returns:
+    Bool: True if the query was executed or False if the permission query failed.
+"""
+def post_request(query, params, permission_query=None, permission_params=None):
+    if permission_query:
+        has_permission = execute_query(permission_query, permission_params).fetchone() is not None
+        if not has_permission:
+            return False
+
+    execute_query(query, params)
+    return True
+    
 
 """
 Handles a simple GET request by executing a SQL query and returning the results as a JSON response.

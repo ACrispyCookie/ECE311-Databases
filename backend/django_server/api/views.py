@@ -3,7 +3,7 @@ import requests
 from cryptography.fernet import Fernet
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponse
 from . import database_service as db_service
 from json import JSONDecodeError
 
@@ -26,13 +26,17 @@ def department(request):
 @csrf_exempt
 @require_http_methods(["GET"])
 def department_courses(request):
-    fernet = Fernet(os.environ.get('FERNET_KEY'))
-    jsessionid = fernet.decrypt(request.headers.get('x-jsessionid', None).encode()).decode()
-    csrf_token = fernet.decrypt(request.headers.get('x-sis-csrf-token', None).encode()).decode()
+    # fernet = Fernet(os.environ.get('FERNET_KEY'))
+    # jsessionid = fernet.decrypt(request.headers.get('x-jsessionid', None).encode()).decode()
+    # csrf_token = fernet.decrypt(request.headers.get('x-sis-csrf-token', None).encode()).decode()
+    jsessionid = request.headers.get('x-jsessionid', None)
+    csrf_token = request.headers.get('x-sis-csrf-token', None)
+    authenticated_user_id = check_authenticated(jsessionid, csrf_token)
     authenticated_user_id = check_authenticated(jsessionid, csrf_token)
     if authenticated_user_id is None:
         return not_authenticated
-    return db_service.get_courses(authenticated_user_id)
+    courseTitle = request.GET.get("search", None)
+    return db_service.get_courses(authenticated_user_id, courseTitle)
 
 
 @csrf_exempt
@@ -54,18 +58,28 @@ def course_categories(request, courseId):
     authenticated_user_id = check_authenticated(jsessionid, csrf_token)
     if authenticated_user_id is None:
         return not_authenticated
-    return db_service.get_categories(authenticated_user_id, courseId)
+    categoryTitle = request.GET.get("search", None)
+    return db_service.get_categories(authenticated_user_id, courseId, categoryTitle)
 
 
 @csrf_exempt
-@require_http_methods(["GET"])
-def category_posts(request, courseId, titleId):
+@require_http_methods(["GET", "POST"])
+def category_posts(request, courseId, categoryTitle):
     jsessionid = request.headers.get('x-jsessionid', None)
     csrf_token = request.headers.get('x-sis-csrf-token', None)
     authenticated_user_id = check_authenticated(jsessionid, csrf_token)
     if authenticated_user_id is None:
         return not_authenticated
-    return db_service.get_category_posts(authenticated_user_id, courseId, titleId)
+    if request.method == "POST":
+        data = request.body.dict()
+        return JsonResponse(data, safe=False)
+        url = data.get("url", None)
+        title = data.get("title", None)
+        if url is None or title is None:
+            return HttpResponse(status=400)
+        return HttpResponse(status=200) if db_service.create_post(url, title, authenticated_user_id, categoryTitle, courseId) else HttpResponse(status=403)
+    postTitle = request.GET.get("search", None)
+    return db_service.get_category_posts(authenticated_user_id, courseId, categoryTitle, postTitle)
 
 
 @csrf_exempt
@@ -96,21 +110,24 @@ def post(request, postId=None):
     jsessionid = request.headers.get('x-jsessionid', None)
     csrf_token = request.headers.get('x-sis-csrf-token', None)
     authenticated_user_id = check_authenticated(jsessionid, csrf_token)
-    if request.method == "POST":
-        return JsonResponse()
-    elif authenticated_user_id is None:
+    if authenticated_user_id is None:
         return not_authenticated
     return db_service.get_post(authenticated_user_id, postId)
 
 
 @csrf_exempt
-@require_http_methods(["GET"])
+@require_http_methods(["GET", "PUT"])
 def post_reactions(request, postId):
     jsessionid = request.headers.get('x-jsessionid', None)
     csrf_token = request.headers.get('x-sis-csrf-token', None)
     authenticated_user_id = check_authenticated(jsessionid, csrf_token)
     if authenticated_user_id is None:
         return not_authenticated
+    if request.method == "PUT":
+        upvote_type = request.POST.get("type", None)
+        if upvote_type == None:
+            return HttpResponse(status=400)
+        return HttpResponse(status=200) if db_service.create_reaction(upvote_type, authenticated_user_id, postId) else HttpResponse(status=403)
     return db_service.get_post_reactions(authenticated_user_id, postId, request.GET)
 
 
