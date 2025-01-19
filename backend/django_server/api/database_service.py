@@ -38,10 +38,10 @@ def get_categories(userId, courseId, categoryTitle):
 
 def get_category_posts(userId, courseId, categoryTitle, postTitle, sortBy):
     if postTitle is None:
-        query = "SELECT * FROM Posts WHERE courseId = %s AND categoryTitle = %s;"
+        query = "SELECT * FROM Posts WHERE courseId = %s AND categoryTitle = %s"
         params = [courseId, categoryTitle]
     else: 
-        query = "SELECT * FROM Posts WHERE courseId = %s AND categoryTitle = %s AND title LIKE %s;"
+        query = "SELECT * FROM Posts WHERE courseId = %s AND categoryTitle = %s AND title LIKE %s"
         params = [courseId, categoryTitle, f"%{postTitle.lower()}%"]
     if sortBy is not None and sortBy["column"] in ["createdAt", "title"] and sortBy["method"].upper() in ["ASC", "DESC"]:
         query = query + " ORDER BY " + sortBy["column"] + " " + sortBy["method"].upper()
