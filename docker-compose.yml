@@ -18,14 +18,22 @@ services:
       MYSQL_PASSWORD: $MYSQL_PASSWORD
       MYSQL_HOST: mysql
       MYSQL_PORT: $MYSQL_PORT
+      UTH_USERNAME: $UTH_USERNAME
+      UTH_PASSWORD: $UTH_PASSWORD
+      FERNET_KEY: $FERNET_KEY
     ports:
       - "9000:9000"
     volumes:
       - "./backend:/app"
+      - "/dev/net:/dev/net"
+    cap_add:
+      - NET_ADMIN
     networks:
       - custom_network
-  mysql:
+    devices:
+      - /dev/net/tun
 
+  mysql:
     image: mysql:latest
     container_name: mysql
     restart: always

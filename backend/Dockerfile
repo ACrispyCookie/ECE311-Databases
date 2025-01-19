@@ -6,8 +6,11 @@ COPY requirements.txt .
 
 RUN pip install --no-cache-dir -r requirements.txt
 
+RUN apt-get update -y
+RUN apt-get install -y openvpn
+
 COPY . .
 
 WORKDIR /app/django_server
 
-CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]
+CMD ["sh", "entrypoint.sh"]
