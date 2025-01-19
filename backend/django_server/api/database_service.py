@@ -1,51 +1,63 @@
 from django.http import HttpResponse, JsonResponse
 from django.db import transaction, connection
 
-def get_department(user_id):
+def get_department(userId):
     query = "SELECT * FROM Departments WHERE departmentCode = (SELECT departmentCode FROM Users WHERE id=%s);"
-    params = [user_id]
+    params = [userId]
     empty_response = JsonResponse({"error": "Department not found"}, safe=False)
     return get_public_request(query, params, empty_response)
 
-def get_courses(user_id):
+def get_courses(userId):
     query = "SELECT * FROM Courses WHERE departmentCode = (SELECT departmentCode FROM Users WHERE id=%s);"
-    params = [user_id]
+    params = [userId]
     return get_public_request(query, params)
 
-def get_course(courseId):
+def get_course(userId, courseId):
     query = "SELECT * FROM Courses WHERE courseId = %s;"
     params = [courseId]
+    permission_query = "SELECT id FROM Users as u INNER JOIN Courses as c ON u.departmentCode=c.departmentCode WHERE u.id=%s AND c.courseId=%s"
+    permission_params = [userId, courseId]
     empty_response = JsonResponse({"error": "Course not found"}, safe=False)
-    return get_public_request(query, params, empty_response)
+    return get_permission_request(query, params, permission_query, permission_params, empty_response)
 
-def get_categories(courseId):
+def get_categories(userId, courseId):
     query = "SELECT * FROM Categories WHERE courseId = %s;"
     params = [courseId]
-    return get_public_request(query, params)
+    permission_query = "SELECT id FROM Users as u INNER JOIN Courses as c ON u.departmentCode=c.departmentCode WHERE u.id=%s AND c.courseId=%s"
+    permission_params = [userId, courseId]
+    return get_permission_request(query, params, permission_query, permission_params, empty_response)
 
-def get_category_posts(courseId, titleId):
+def get_category_posts(userId, courseId, titleId):
     query = "SELECT * FROM Posts WHERE courseId = %s AND titleId = %s;"
     params = [courseId, titleId]
-    return get_public_request(query, params)
+    permission_query = "SELECT id FROM Users as u INNER JOIN Courses as c ON u.departmentCode=c.departmentCode WHERE u.id=%s AND c.courseId=%s"
+    permission_params = [userId, courseId]
+    return get_permission_request(query, params, permission_query, permission_params, empty_response)
 
-def get_user(userId):
+def get_user(userId, user_to_find):
     query = "SELECT * FROM Users WHERE id = %s;"
-    params = [userId]
+    params = [user_to_find]
+    permission_query = "SELECT id FROM Users WHERE id=%s AND departmentCode IN (SELECT departmentCode FROM Users WHERE id=%s);"
+    permission_params = [userId, user_to_find]
     empty_response = JsonResponse({"error": "User not found"}, safe=False)
-    return get_public_request(query, params, empty_response)
+    return get_permission_request(query, params, permission_query, permission_params, empty_response)
 
-def get_user_posts(userId):
+def get_user_posts(userId, user_to_find):
     query = "SELECT * FROM Posts WHERE userId = %s;"
-    params = [userId]
-    return get_public_request(query, params)
+    params = [user_to_find]
+    permission_query = "SELECT id FROM Users WHERE id=%s AND departmentCode IN (SELECT departmentCode FROM Users WHERE id=%s);"
+    permission_params = [userId, user_to_find]
+    return get_permission_request(query, params, permission_query, permission_params)
 
-def get_post(postId):
+def get_post(userId, postId):
     query = "SELECT * FROM Posts WHERE id = %s;"
     params = [postId]
+    permission_query = "SELECT u.id FROM Users as u INNER JOIN Courses as c ON u.departmentCode=c.departmentCode INNER JOIN Posts as p ON p.courseId=c.courseId WHERE u.id=%s AND p.id=%s"
+    permission_params = [userId, postId]
     empty_response = JsonResponse({"error": "Post not found"}, safe=False)
-    return get_public_request(query, params, empty_response)
+    return get_permission_request(query, params, permission_query, permission_params, empty_response)
 
-def get_post_reactions(postId, params):
+def get_post_reactions(userId, postId, params):
     if "type" not in params or params["type"] not in ["0", "1"]:
         return JsonResponse({"error": "Invalid request"}, safe=False)
     type_name = "upvotes" if params["type"] == "1" else "downvotes" 
@@ -56,7 +68,9 @@ def get_post_reactions(postId, params):
     else:
         query = "SELECT * FROM Reactions WHERE postId = %s AND upvote = %s;"
     params = [postId, params["type"]]
-    return get_public_request(query, params)
+    permission_query = "SELECT u.id FROM Users as u INNER JOIN Courses as c ON u.departmentCode=c.departmentCode INNER JOIN Posts as p ON p.courseId=c.courseId WHERE u.id=%s AND p.id=%s"
+    permission_params = [userId, postId]
+    return get_permission_request(query, params, permission_query, permission_params)
 
 def create_department(departmentCode, departmentTitle, courses):
     execute_query("INSERT INTO Departments (departmentTitle, departmentCode) VALUES (%s, %s)", [departmentTitle, departmentCode])
@@ -69,8 +83,8 @@ def create_course(courseTitle, courseCode, courseId, departmentCode):
 def create_category(categoryTitle, courseId):
     execute_query("INSERT INTO Categories (categoryTitle, courseId) VALUES (%s, %s)", [categoryTitle, courseId])
 
-def create_user(user_id, username, departmentCode):
-    execute_query("INSERT INTO Users (username, id, departmentCode) VALUES (%s, %s, %s)", [username, user_id, departmentCode])
+def create_user(userId, username, departmentCode):
+    execute_query("INSERT INTO Users (username, id, departmentCode) VALUES (%s, %s, %s)", [username, userId, departmentCode])
 
 def create_post(url, title, userId, titleId, courseId):
     pass
@@ -98,7 +112,7 @@ Returns:
 """
 def get_request(query, params, permission_query=None, permission_params=None, empty_response=None):
     if permission_query:
-        has_permission = len(execute_query(permission_query, permission_params).fetchone() != 0)
+        has_permission = execute_query(permission_query, permission_params).fetchone() is not None
         if not has_permission:
             return JsonResponse({"error": "No permission"}, safe=False)
 
