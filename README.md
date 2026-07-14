@@ -1,28 +1,88 @@
-# DatabasesProject
+# ECE311 — Databases
 
-### Setup
-To get started run the following commands:
+Coursework repository for ECE311 Databases. It contains a Dockerized Django/MySQL backend for a course-notes application, database schema design files, and API endpoints for departments, courses, categories, posts, users, and reactions.
 
-```cmd
+## Contents
+
+| Path | Description |
+|---|---|
+| `backend/django_server/` | Django project and API application. |
+| `backend/django_server/api/` | URL routes, views, and database service helpers for the notes API. |
+| `backend/Dockerfile` | Backend image definition with Python, Django dependencies, and OpenVPN. |
+| `database/schema.sql` | MySQL schema for users, departments, courses, categories, posts, reactions, and roles. |
+| `database/init.sql` | Small seed dataset for local development. |
+| `database/assignment.erdt` | ERD/design artifact for the database assignment. |
+| `docker-compose.yml` | Local development stack with Django, MySQL, and phpMyAdmin. |
+
+## Requirements
+
+- Docker and Docker Compose
+- A `.env` file based on `.env.example`
+- UTH VPN credentials if the backend needs to call UTH SIS endpoints from inside the container
+
+## Setup
+
+Copy the example environment file and fill in the missing values:
+
+```bash
 cp .env.example .env
 ```
 
-```cmd
-docker-compose up django mysql phpmyadmin
+Generate a Fernet key for encrypted client cookies/tokens:
+
+```bash
+python3 - <<'PY'
+import base64, os
+print(base64.urlsafe_b64encode(os.urandom(32)).decode())
+PY
 ```
 
-```cmd
-docker exec -it mysql /bin/bash
+Optionally generate a Django development secret key:
+
+```bash
+python3 - <<'PY'
+import secrets, string
+chars = string.ascii_letters + string.digits + string.punctuation
+print(''.join(secrets.choice(chars) for _ in range(50)))
+PY
 ```
 
-```cmd
-mysql -u user -psecret
+Start the local stack:
+
+```bash
+docker compose up --build notes_app mysql phpmyadmin
 ```
 
-```sql
-USE project_database;
+The services expose:
+
+| Service | URL |
+|---|---|
+| Django API | `http://localhost:9000/` |
+| phpMyAdmin | `http://localhost:8080/` |
+
+For a fresh MySQL volume, Docker initializes the database from:
+
+```text
+database/schema.sql
+database/init.sql
 ```
 
-Copy and paste the contents of `/database/schema.sql` in the terminal to create the schema of MySQL database.
+If a database volume already exists, remove it first or apply the SQL files manually.
 
-(TODO: automate schema and seed)
+## Useful API routes
+
+```text
+GET  /department
+GET  /department/courses
+GET  /courses/<courseId>
+GET  /courses/<courseId>/categories
+GET  /categories/<courseId>/<categoryTitle>/posts
+POST /categories/<courseId>/<categoryTitle>/posts
+GET  /users/<userId>
+GET  /users/<userId>/posts
+GET  /posts/<postId>
+GET  /posts/<postId>/reactions
+PUT  /posts/<postId>/reactions
+```
+
+Most endpoints expect encrypted `x-jsessionid` and `x-sis-csrf-token` headers and validate the session against UTH SIS before returning data.
